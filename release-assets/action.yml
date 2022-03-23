@@ -1,0 +1,44 @@
+name: release-assets
+description: Upload release assets
+author: cdce8p
+inputs:
+  github_token:
+    description: GITHUB_TOKEN with 'contents' write permission
+    required: false
+    default: ${{ github.token }}
+  paths:
+    description: List of files and / or folders
+    required: true
+  file_map:
+    description: |
+      List. Filter and map file names to content types. E.g.
+      "*.whl=application/zip, *.tar.gz=application/gzip"
+    required: true
+  delete_existing_assets:
+    description: Delete existing assets before upload
+    required: false
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    - name: Fail if not release event
+      if: github.event_name != 'release'
+      shell: bash
+      run: |
+        echo "::error::Action can only be run for 'release' events"
+        echo "::error::Current event_name: '${{ github.event_name }}'"
+        exit 1
+    - name: Run upload script
+      shell: bash
+      run: |
+        echo "::group::Upload assets"
+        CONTEXT=$(echo '${{ toJSON( github.event.release ) }}' | jq -c 'del(.author)')
+
+        python3 ${{ github.action_path }}/upload_assets.py \
+          --token "${{ inputs.github_token }}" \
+          --release_ctx "$CONTEXT" \
+          --file_map "${{ inputs.file_map }}" \
+          --delete_existing_assets "${{ inputs.delete_existing_assets }}" \
+          --paths "${{ inputs.paths }}"
+        echo "::endgroup::"
